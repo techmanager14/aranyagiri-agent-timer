@@ -1,0 +1,28 @@
+name: Wake the AI agent
+
+# Checks for new WhatsApp messages about once a minute. GitHub starts this every
+# 5 minutes; each run wakes the agent five times, 55 seconds apart. The link,
+# with its key, is a secret of this repository and never appears here.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: wake-agent
+  cancel-in-progress: false
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Wake the agent every minute for five minutes
+        env:
+          WAKE_URL: ${{ secrets.WAKE_URL }}
+        run: |
+          for i in 1 2 3 4 5; do
+            code=$(curl -s -m 55 -o /dev/null -w "%{http_code}" "$WAKE_URL" || echo "failed")
+            echo "$(date -u +%H:%M:%S) woke the agent: $code"
+            [ "$i" -lt 5 ] && sleep 55
+          done
