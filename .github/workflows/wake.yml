@@ -2,9 +2,10 @@ name: Wake the AI agent
 
 # Checks for new WhatsApp messages every 10 seconds, so guests get a reply
 # within about 10 to 20 seconds. One run keeps checking for almost six hours
-# (GitHub's limit for a job); a new run is started every 30 minutes and waits
-# in line, so the next one takes over as soon as the last one ends. The link,
-# with its key, is a secret of this repository and never appears here.
+# (GitHub's limit for a job). Each run starts the next one itself as it ends,
+# even after a failure, because GitHub's schedule cannot be relied on; the
+# schedule below is only a backup. The link, with its key, is a secret of this
+# repository and never appears here.
 on:
   schedule:
     - cron: "*/30 * * * *"
@@ -13,6 +14,10 @@ on:
 concurrency:
   group: wake-agent
   cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: read
 
 jobs:
   wake:
@@ -23,7 +28,7 @@ jobs:
         env:
           WAKE_URL: ${{ secrets.WAKE_URL }}
         run: |
-          end=$(( $(date +%s) + 350 * 60 ))
+          end=$(( $(date +%s) + 345 * 60 ))
           count=0
           while [ "$(date +%s)" -lt "$end" ]; do
             code=$(curl -s -m 58 -o /dev/null -w "%{http_code}" "$WAKE_URL" || echo "failed")
@@ -33,3 +38,9 @@ jobs:
             fi
             sleep 10
           done
+
+      - name: Start the next run
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run wake.yml -R "$GITHUB_REPOSITORY" --ref main
