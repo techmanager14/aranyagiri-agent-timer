@@ -1,11 +1,13 @@
 name: Wake the AI agent
 
-# Checks for new WhatsApp messages about once a minute. GitHub starts this every
-# 5 minutes; each run wakes the agent five times, 55 seconds apart. The link,
+# Checks for new WhatsApp messages every 10 seconds, so guests get a reply
+# within about 10 to 20 seconds. One run keeps checking for almost six hours
+# (GitHub's limit for a job); a new run is started every 30 minutes and waits
+# in line, so the next one takes over as soon as the last one ends. The link,
 # with its key, is a secret of this repository and never appears here.
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/30 * * * *"
   workflow_dispatch:
 
 concurrency:
@@ -15,14 +17,19 @@ concurrency:
 jobs:
   wake:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 358
     steps:
-      - name: Wake the agent every minute for five minutes
+      - name: Wake the agent every 10 seconds
         env:
           WAKE_URL: ${{ secrets.WAKE_URL }}
         run: |
-          for i in 1 2 3 4 5; do
-            code=$(curl -s -m 55 -o /dev/null -w "%{http_code}" "$WAKE_URL" || echo "failed")
-            echo "$(date -u +%H:%M:%S) woke the agent: $code"
-            [ "$i" -lt 5 ] && sleep 55
+          end=$(( $(date +%s) + 350 * 60 ))
+          count=0
+          while [ "$(date +%s)" -lt "$end" ]; do
+            code=$(curl -s -m 58 -o /dev/null -w "%{http_code}" "$WAKE_URL" || echo "failed")
+            count=$((count + 1))
+            if [ "$code" != "200" ] || [ $((count % 60)) -eq 1 ]; then
+              echo "$(date -u +%H:%M:%S) check $count: $code"
+            fi
+            sleep 10
           done
